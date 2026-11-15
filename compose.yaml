@@ -1,0 +1,70 @@
+name: jupiter-jr
+x-backend: &backend
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  image: jupiter-jr-backend:1.2.1
+  environment:
+    DATABASE_URL: postgresql+psycopg://jupiter:${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}@db:5432/jupiter
+    PRIVATE_STORAGE: /private
+    APP_ORIGINS: ${APP_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+    SECURE_COOKIES: ${SECURE_COOKIES:-0}
+    CSV_CHUNK_SIZE: ${CSV_CHUNK_SIZE:-10000}
+    PLAYWRIGHT_BROWSERS_PATH: /opt/playwright
+  volumes: [private:/private]
+services:
+  db:
+    image: postgis/postgis:16-3.5@sha256:94146ac37bc61e2322f88016056c5920729cb8c64c8542ed590af8fc2abdac07
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: jupiter
+      POSTGRES_USER: jupiter
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    volumes: [postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U jupiter -d jupiter"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+  migrate:
+    <<: *backend
+    command: ["sh","-c","alembic -c backend/alembic.ini upgrade head && python -m jupiter.seed"]
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *backend
+    command: ["uvicorn","jupiter.api:app","--host","0.0.0.0","--port","8000","--no-access-log"]
+    restart: unless-stopped
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    <<: *backend
+    command: ["python","-m","jupiter.worker"]
+    init: true
+    restart: unless-stopped
+    shm_size: 512mb
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_MAP_STYLE: ${VITE_MAP_STYLE:-https://tiles.openfreemap.org/styles/liberty}
+    ports: ["127.0.0.1:8080:80"]
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD","wget","-q","--spider","http://127.0.0.1/api/health"]
+      interval: 15s
+      timeout: 4s
+      retries: 4
+volumes:
+  postgres:
+  private:

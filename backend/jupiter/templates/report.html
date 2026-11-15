@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><title>Informe de rotación · Júpiter Jr</title>
+<style>
+@page {size:A4;margin:13mm 14mm 17mm}
+*{box-sizing:border-box} body{margin:0;font:10pt Arial,sans-serif;color:#163629;line-height:1.38}
+header{min-height:33px;margin-bottom:6mm;break-inside:avoid;font-size:15pt;font-weight:700}
+header img{width:33px;height:33px;vertical-align:middle;margin-right:9px}
+header small{font-size:8pt;font-weight:400;color:#546c5f;margin-left:5mm}
+.hero{background:#123a2c;color:white;padding:7mm;border-radius:4mm;margin-bottom:5mm}
+.hero h1{margin:1mm 0 2mm;font-size:26pt;line-height:1.06;letter-spacing:-.8pt}
+.hero p{margin:0;color:#d3e2d9}.tag{color:#dcf882;font-weight:bold;text-transform:uppercase;font-size:8pt;letter-spacing:1pt}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin:0 0 4mm}
+.card{padding:4mm;border:1px solid #dee7dc;border-radius:3mm;background:#f7f9f4}
+.card p{margin:1.4mm 0} h2{font-size:14pt;margin:3mm 0 2mm} h3{margin:0 0 1.5mm;font-size:11pt}
+.map{width:100%;height:36mm;object-fit:cover;border-radius:2mm}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-bottom:4mm}.kpi strong{font-size:17pt;display:block}
+.plot{width:100%;height:61mm;object-fit:contain;display:block;margin-bottom:1mm}.plot.comparison{height:52mm}.source{font-size:8pt;color:#536d5d;margin:0;overflow-wrap:anywhere}
+table{border-collapse:collapse;width:100%;font-size:9pt;margin-bottom:3mm} td,th{text-align:left;border-bottom:1px solid #dde7db;padding:2mm}
+th{background:#e9f0e6}.chosen{background:#e8f2d5}.report-page+.report-page{break-before:page} section,table,tr{break-inside:avoid}
+ol,ul{margin:1mm 0 3mm;padding-left:5mm} li{margin:1mm 0}.note{padding:3mm 4mm;background:#eef3e6;border-radius:2mm;margin-top:3mm}
+</style><body><article class="report-page">
+<header><img src="{{logo}}" alt="">Júpiter Jr <small>Informe {{item.id|string|truncate(13,True,'')}} · {{item.created.date().isoformat()}}</small></header>
+<div class="hero"><div class="tag">{{output.status}} · Catálogo ilustrativo</div><h1>Informe de rotación agrícola</h1><p>{{field.name}} · {{item.producer}}</p></div>
+<div class="grid"><div class="card"><h3>Ficha del lote</h3><p>{{'%.6f'|format(field.lat)}}°, {{'%.6f'|format(field.lon)}}° · WGS 84</p>
+<p>{% if field.area_ha %}{{'%.2f'|format(field.area_ha)}} ha{% else %}Punto exploratorio · perímetro pendiente{% endif %}</p>
+<p>Versión {{field.version}} · {{field.source}}</p><p>Prioridad: {{{'balanced':'Equilibrada','water':'Agua','cover':'Cobertura','diversity':'Diversidad'}[item.inputs.priority]}}</p></div><div class="card"><img class="map" src="{{map_data}}" alt="Mapa esquemático del lote con norte y escala"></div></div>
+<h2>{{selected.names|join(' → ')}}</h2>
+<div class="kpis">{% for key in ['deficit_mm','stress_days','cover_pct'] %}{% set v=selected.metrics.historical[key] %}<div class="card kpi">{{metrics[key][0]}}<strong>{{v if v is not none else 'Pendiente'}}{% if v is not none %} <small>{{metrics[key][1]}}</small>{% endif %}</strong></div>{% endfor %}</div>
+<h2>Clima histórico del punto</h2><img class="plot" src="{{chart}}" alt="Clima histórico mensual"><p class="source">{{output.source.product}} · {{output.source.start}} a {{output.source.end}} · {{output.source.time_standard}} · {{output.source.rows}} días · {{output.source.support}}</p>
+</article><article class="report-page">
+<header>Júpiter Jr <small>Comparación y procedencia</small></header>
+<h2>Comparación de tres campañas</h2><img class="plot comparison" src="{{comparison}}" alt="Déficit y cobertura por alternativa">
+<table><thead><tr><th>Rotación</th><th>Puntaje</th><th>Déficit (mm)</th><th>Cobertura</th></tr></thead><tbody>
+{% for r in output.alternatives + ([output.reference] if output.reference else []) %}<tr class="{{'chosen' if r.id==selected.id else ''}}"><td>{% if r.id=='reference' %}Referencia · {% endif %}{{r.names|join(' → ')}}</td><td>{{r.score}}</td><td>{{r.metrics.historical.deficit_mm if r.metrics.historical.deficit_mm is not none else 'Pendiente'}}</td><td>{{r.metrics.historical.cover_pct}} %</td></tr>{% endfor %}</tbody></table>
+{% if not output.reference %}<p class="source">La referencia requiere un cultivo anterior compatible con el modelo anual y el calendario elegido.</p>{% endif %}
+<h3>Calendario de la opción elegida</h3><p>{% for c in selected.calendar %}Campaña {{loop.index}} · {{c.crop}} (mes {{c.month}}, {{c.duration}} días){{' / ' if not loop.last else ''}}{% endfor %}</p>
+<p>Ventanas de tres años: {{selected.metrics.historical.windows|join(', ') if selected.metrics.historical.windows else 'pendientes'}}. Sensibilidad: lluvia {{item.inputs.rainfall_shift_pct}} % y temperatura {{item.inputs.warming_c}} °C.</p>
+<h3>Suelo y datos por confirmar</h3><p>{{output.missing|join(', ') or 'Entradas declaradas por el productor.'}}. {% if output.trial %}Se habilitaron supuestos de ensayo para completar entradas críticas ausentes.{% endif %}</p>
+{% if output.excluded %}<p>{% for crop,reasons in output.excluded.items() %}{{crop}}: {{reasons|join(' ')}} {% endfor %}</p>{% endif %}
+<ul>{% for a in output.actions %}<li><b>{{a.item}}.</b> {{a.reason}}</li>{% endfor %}</ul>
+<h3>Calidad y procedencia</h3><p class="source">Pesos nominales: agua {{(100*output.weights[0])|round|int}} %, cobertura {{(100*output.weights[1])|round|int}} %, diversidad {{(100*output.weights[2])|round|int}} %. {% if selected.metrics.sensitivity.deficit_mm is not none %}Déficit medio bajo sensibilidad: {{selected.metrics.sensitivity.deficit_mm}} mm.{% endif %}</p><p class="source">Análisis {{item.run_id}} · Versión {{output.version}} · Catálogo {{output.catalog_version}} · FAO 56. {{output.source.missing_days}} días ausentes y {{output.source.incomplete_days}} observaciones incompletas.<br>SHA-256 {{output.source.sha256}}</p>
+<p class="source" style="margin-top:2mm">{{output.limitations|join(' ')}}</p>
+</article>
+{% if selected.recommendation %}
+<article class="report-page">
+<header>Júpiter Jr <small>Orientación para el productor</small></header>
+<h2>Recomendaciones basadas en el análisis</h2>
+<div class="card"><h3>{{selected.recommendation.title}}</h3><p><b>{{selected.names|join(' → ')}}</b></p>
+<ul>{% for reason in selected.recommendation.reasons %}<li>{{reason}}</li>{% endfor %}</ul>
+<p>{{selected.recommendation.check}}</p><p class="source">Prácticas de salud del suelo · <a href="{{selected.recommendation.source}}">USDA NRCS</a>. Parámetros de cultivo · <a href="{{output.catalog_source}}">FAO 56</a>.</p></div>
+{% if output.regional_soil %}{% set soil=output.regional_soil %}
+<h3 style="margin-top:4mm">Perfil estimado del suelo</h3>
+<p>{{soil.texture or 'Textura pendiente'}} (0–5 cm). Arena {{soil.surface.sand if soil.surface.sand is not none else '—'}} %, limo {{soil.surface.silt if soil.surface.silt is not none else '—'}} %, arcilla {{soil.surface.clay if soil.surface.clay is not none else '—'}} %. pH {{soil.surface.phh2o if soil.surface.phh2o is not none else '—'}}{% if soil.ph_interval %} · intervalo del 90 % {{soil.ph_interval|join(' a ')}}{% endif %}. Carbono orgánico {{soil.surface.soc if soil.surface.soc is not none else '—'}} g/kg.</p>
+<p class="source"><a href="{{soil.url}}">{{soil.provider}}</a> · {{soil.resolution_m}} m · Consultado el {{soil.retrieved[:10]}}. {% if output.regional_retention %}El balance usa la retención estimada ponderada por la profundidad útil informada.{% else %}El perfil se adjunta como contexto. {% endif %} Contrasta con muestreo de laboratorio.</p>
+{% endif %}
+{% if output.moisture %}<h3 style="margin-top:4mm">Humedad regional</h3><p>La anomalía de humedad compara meses completos con la mediana histórica del mismo mes. La estimación representa el entorno regional.</p><p class="source"><a href="{{output.moisture.url}}">{{output.moisture.source}}</a> · {{output.moisture.support}}.</p>{% endif %}
+<p class="note">La recomendación orienta la comparación. Los datos climáticos regionales, la respuesta del cultivo y las propiedades de suelo tienen incertidumbre. Confirma la decisión con el productor y un profesional local.</p>
+</article>
+{% endif %}
+{% if output.environment %}
+<article class="report-page">
+<header>Júpiter Jr <small>Condiciones y meses críticos</small></header>
+<h2>Integración de clima y humedad regional</h2><p>{{output.environment.alignment}} {{output.environment.method}}</p>
+<h3>Comparación de tendencias</h3><table><thead><tr><th>Variable</th><th>Lineal / década</th><th>Theil–Sen / década</th><th>Unidad</th><th>Años</th></tr></thead><tbody>
+{% for t in output.environment.trends %}<tr><td>{{t.label}}</td><td>{{t.ols_decade}}</td><td>{{t.sen_decade}}</td><td>{{t.unit}}</td><td>{{t.start}}–{{t.end}}</td></tr>{% endfor %}</tbody></table>
+<p class="source">Regresión lineal de medias o totales anuales y mediana de pendientes entre pares (Theil–Sen). {{output.environment.uncertainty}}</p>
+{% for c in output.environment.correlations %}<p>{{c.label}} · Pearson {{c.r if c.r is not none else 'Pendiente'}} · {{c.n}} meses completos.</p>{% endfor %}
+{% if selected.timeline and selected.timeline.historical %}<h3>Meses de mayor déficit simulado</h3><p>Primera ventana completa del histórico, alternativa elegida. El resto de ventanas se resume en el rango histórico de las recomendaciones.</p>
+<table><thead><tr><th>Mes</th><th>Déficit (mm)</th><th>Días con déficit</th><th>Días fuera de cultivo</th></tr></thead><tbody>
+{% for m in (selected.timeline.historical|sort(attribute='deficit_mm',reverse=True))[:6] %}<tr><td>{{m.month}}</td><td>{{m.deficit_mm}}</td><td>{{m.stress_days}}</td><td>{{m.fallow_days}}</td></tr>{% endfor %}</tbody></table>
+{% endif %}
+<h3>Interpretación y validación local</h3><p>La evapotranspiración representa evaporación del suelo y transpiración de las plantas. ET₀ indica demanda atmosférica de referencia. El déficit compara demanda y consumo simulado. Los meses con lluvia menor que ET₀ orientan la revisión de agua disponible.</p>
+<p>La humedad de MERRA-2 es una estimación regional relativa. El mapa ofrece contexto satelital de vegetación, lluvia, humedad, temperatura superficial, biomasa leñosa y relieve. Las mediciones de campo aportan profundidad y condiciones del terreno para contrastar estos resultados.</p>
+<p class="source">Fuentes climáticas y métodos · <a href="https://power.larc.nasa.gov/docs/methodology/data/sources/">NASA POWER</a> · <a href="https://power.larc.nasa.gov/docs/methodology/data/sources_hydrology/">NASA POWER MERRA-2</a> · <a href="https://www.fao.org/4/x0490e/x0490e00.htm">FAO 56</a>. Catálogo regional · <a href="https://ice.santacruz.gob.bo/uploads/SANTA_CRUZ_ESTADISTICO_2024_a8a96110b3.pdf">ICE 2024, página 47, fuente INE</a>.</p>
+</article>
+{% endif %}
+</body></html>

@@ -1,0 +1,6 @@
+# Use only with a LAN HTTPS reverse proxy and a certificate trusted by the phone.
+services:
+  api:
+    environment:
+      APP_ORIGINS: ${LAN_ORIGIN:?Define el origen HTTPS confiable del proxy LAN}
+      SECURE_COOKIES: "1"

@@ -1,0 +1,33 @@
+# Free demonstration. Render Free Postgres expires after 30 days.
+services:
+  - type: web
+    name: jupiter-jr
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jupiter-db
+          property: connectionString
+      - key: SECURE_COOKIES
+        value: "1"
+      - key: PRIVATE_STORAGE
+        value: /tmp/jupiter-private
+      - key: DATABASE_FILE_STORAGE
+        value: "1"
+      - key: LOW_MEMORY
+        value: "1"
+      - key: CSV_CHUNK_SIZE
+        value: "10000"
+databases:
+  - name: jupiter-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+    databaseName: jupiter
+    user: jupiter
+    ipAllowList: []

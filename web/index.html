@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#112d25"><meta name="description" content="Planifica rotaciones agrícolas con clima histórico NASA POWER y datos de tu lote.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml"><title>Júpiter Jr · Planificación agrícola</title></head>
+<body><div id="root"><main style="max-width:38rem;margin:15vh auto;padding:24px;font:16px Arial,sans-serif;color:#163629">
+<h1>Abriendo Júpiter Jr</h1><p>Conectando con tu espacio de planificación agrícola…</p>
+<p id="boot-status" role="status">La primera conexión puede tardar mientras se inicia el alojamiento gratuito.</p>
+<button type="button" onclick="location.reload()" style="padding:12px 20px;cursor:pointer">Volver a cargar</button>
+<noscript><p>Activa JavaScript en el navegador para utilizar los mapas y el análisis.</p></noscript>
+</main></div>
+<script>
+window.addEventListener('error', function(event) {
+  if (event.target && event.target.tagName === 'SCRIPT') {
+    var status = document.getElementById('boot-status');
+    if (status) status.textContent = 'No se descargaron todos los recursos. Comprueba tu conexión y pulsa Volver a cargar.';
+  }
+}, true);
+window.addEventListener('vite:preloadError', function(event) {
+  var previous = Number(sessionStorage.getItem('jupiter-asset-reload') || 0);
+  if (Date.now() - previous > 60000) {
+    event.preventDefault();
+    sessionStorage.setItem('jupiter-asset-reload', String(Date.now()));
+    location.reload();
+  }
+});
+</script><script type="module" src="/src/main.tsx"></script></body></html>
